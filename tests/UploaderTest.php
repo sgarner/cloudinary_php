@@ -1,8 +1,8 @@
 <?php
-$base = realpath(dirname(__FILE__).'/../');
-require_once($base . DIRECTORY_SEPARATOR . 'src/Cloudinary.php');
-require_once($base . DIRECTORY_SEPARATOR . 'src/Uploader.php');
-require_once($base . DIRECTORY_SEPARATOR . 'src/Api.php');
+$base = realpath(dirname(__FILE__).DIRECTORY_SEPARATOR.'..');
+require_once(join(DIRECTORY_SEPARATOR, array($base, 'src', 'Cloudinary.php')));
+require_once(join(DIRECTORY_SEPARATOR, array($base, 'src', 'Uploader.php')));
+require_once(join(DIRECTORY_SEPARATOR, array($base, 'src', 'Api.php')));
 
 class UploaderTest extends PHPUnit_Framework_TestCase {
     public function setUp() {
@@ -72,6 +72,62 @@ class UploaderTest extends PHPUnit_Framework_TestCase {
         Cloudinary\Uploader::replace_tag("tag3", $result["public_id"]);
         $info = $api->resource($result["public_id"]);
         $this->assertEquals($info["tags"], array("tag3"));
+    }
+
+    public function test_use_filename() {
+        $api = new \Cloudinary\Api();      
+        $result = Cloudinary\Uploader::upload("tests/logo.png", array("use_filename"=>TRUE));
+        $this->assertRegExp('/logo_[a-zA-Z0-9]{6}/', $result["public_id"]);
+        $result = Cloudinary\Uploader::upload("tests/logo.png", array("use_filename"=>TRUE, "unique_filename"=>FALSE));
+        $this->assertEquals("logo", $result["public_id"]);
+    }
+    
+    public function test_allowed_formats() {
+      	//should allow whitelisted formats if allowed_formats
+      	$formats = array("png"); 
+      	$result = Cloudinary\Uploader::upload("tests/logo.png", array("allowed_formats" => $formats));
+      	$this->assertEquals($result["format"], "png");
+    }
+
+    public function test_allowed_formats_with_illegal_format() {
+        //should prevent non whitelisted formats from being uploaded if allowed_formats is specified
+        $error_found = FALSE;
+        $formats = array("jpg"); 
+        try{
+          Cloudinary\Uploader::upload("tests/logo.png", array("allowed_formats" => $formats));
+        } catch (Exception $e) {
+        	$error_found = TRUE;
+        }
+        $this->assertTrue($error_found);
+    }
+    
+    public function test_allowed_formats_with_format() {
+      	//should allow non whitelisted formats if type is specified and convert to that type
+      	$formats = array("jpg"); 
+      	$result = Cloudinary\Uploader::upload("tests/logo.png", array("allowed_formats" => $formats, "format" => "jpg"));
+      	$this->assertEquals("jpg", $result["format"]);
+    }
+    
+    public function test_face_coordinates() {
+        //should allow sending face coordinates
+        $coordinates = array(array(120, 30, 109, 150), array(121, 31, 110, 151));
+        $result = Cloudinary\Uploader::upload("tests/logo.png", array("face_coordinates" => $coordinates, "faces" => TRUE));
+        $this->assertEquals($coordinates, $result["faces"]);
+
+        $different_coordinates = array(array(122, 32, 111, 152));
+        Cloudinary\Uploader::explicit($result["public_id"], array("face_coordinates" => $different_coordinates, "faces" => TRUE, "type" => "upload"));
+        $api = new \Cloudinary\Api();
+        $info = $api->resource($result["public_id"], array("faces" => true));
+        $this->assertEquals($different_coordinates, $info["faces"]);
+    }
+    
+    public function test_context() {
+      	//should allow sending context
+      	$context = array("caption" => "some caption", "alt" => "alternative");
+      	$result = Cloudinary\Uploader::upload("tests/logo.png", array("context" => $context));
+        $api = new \Cloudinary\Api();
+      	$info = $api->resource($result["public_id"], array("context" => true));
+      	$this->assertEquals(array("custom" => $context), $info["context"]);
     }
     
     public function test_cl_form_tag() {

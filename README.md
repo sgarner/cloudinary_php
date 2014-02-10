@@ -15,6 +15,9 @@ For PHP, Cloudinary provides an extension for simplifying the integration even f
 ![](http://res.cloudinary.com/cloudinary/image/upload/see_more_bullet.png)  **Take a look at our [Getting started guide for PHP](http://cloudinary.com/documentation/php_integration#getting_started_guide)**.
 
 
+## CakePHP ##
+Dedicated CakePHP plugin is also available. You can browse the code, installation and usage information [at the `cloudinary_cake_php` repository](https://github.com/cloudinary/cloudinary_cake_php).
+
 ## Setup ######################################################################
 
 Download cloudinary_php from [here](https://github.com/cloudinary/cloudinary_php/tarball/master)
@@ -200,3 +203,4 @@ Stay tuned for updates, tips and tutorials: [Blog](http://cloudinary.com/blog), 
 ## License #######################################################################
 
 Released under the MIT license. 
+

@@ -52,13 +52,21 @@ class Api {
     $type = \Cloudinary::option_get($options, "type");
     $uri = array("resources", $resource_type);
     if ($type) array_push($uri, $type);
-    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "prefix", "tags")), $options);    
+    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "prefix", "tags", "context", "direction")), $options);    
   }
   
   function resources_by_tag($tag, $options=array()) {
     $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
     $uri = array("resources", $resource_type, "tags", $tag);
-    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results")), $options);    
+    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "tags", "context", "direction")), $options);    
+  }
+  
+  function resources_by_ids($public_ids, $options=array()) {
+    $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
+    $type = \Cloudinary::option_get($options, "type", "upload");
+    $uri = array("resources", $resource_type, $type);
+    $params = array_merge($options, array("public_ids" => $public_ids));
+    return $this->call_api("get", $uri, $this->only($params, array("public_ids", "tags", "context")), $options);    
   }
   
   function resource($public_id, $options=array()) {
@@ -79,13 +87,20 @@ class Api {
     $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
     $type = \Cloudinary::option_get($options, "type", "upload");
     $uri = array("resources", $resource_type, $type);
-    return $this->call_api("delete", $uri, array_merge(array("prefix"=>$prefix), $this->only($options, array("keep_original"))), $options);      
+    return $this->call_api("delete", $uri, array_merge(array("prefix"=>$prefix), $this->only($options, array("keep_original", "next_cursor"))), $options);      
+  }
+  
+  function delete_all_resources($options=array()) {
+    $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
+    $type = \Cloudinary::option_get($options, "type", "upload");
+    $uri = array("resources", $resource_type, $type);
+    return $this->call_api("delete", $uri, array_merge(array("all"=>True), $this->only($options, array("keep_original", "next_cursor"))), $options);      
   }  
   
   function delete_resources_by_tag($tag, $options=array()) {
     $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
     $uri = array("resources", $resource_type, "tags", $tag);
-    return $this->call_api("delete", $uri, $this->only($options, array("keep_original")), $options);    
+    return $this->call_api("delete", $uri, $this->only($options, array("keep_original", "next_cursor")), $options);    
   }
   
     function delete_derived_resources($derived_resource_ids, $options=array()) {
@@ -145,7 +160,8 @@ class Api {
     curl_setopt($ch, CURLOPT_TIMEOUT, 360);
     curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     curl_setopt($ch, CURLOPT_USERPWD, "{$api_key}:{$api_secret}");
-    curl_setopt($ch, CURLOPT_CAINFO,realpath(dirname(__FILE__))."/cacert.pem");
+    curl_setopt($ch, CURLOPT_CAINFO,realpath(dirname(__FILE__)).DIRECTORY_SEPARATOR."cacert.pem");
+    curl_setopt($ch, CURLOPT_USERAGENT, \Cloudinary::USER_AGENT);
     $response = $this->execute($ch);       
     $curl_error = NULL;
     if(curl_errno($ch))

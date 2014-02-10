@@ -18,6 +18,7 @@ namespace Cloudinary {
                 "eager" => Uploader::build_eager(\Cloudinary::option_get($options, "eager")),
                 "headers" => Uploader::build_custom_headers(\Cloudinary::option_get($options, "headers")),
                 "use_filename" => \Cloudinary::option_get($options, "use_filename"),
+                "unique_filename" => \Cloudinary::option_get($options, "unique_filename"),
                 "discard_original_filename" => \Cloudinary::option_get($options, "discard_original_filename"),
                 "notification_url" => \Cloudinary::option_get($options, "notification_url"),
                 "eager_notification_url" => \Cloudinary::option_get($options, "eager_notification_url"),
@@ -25,8 +26,12 @@ namespace Cloudinary {
                 "invalidate" => \Cloudinary::option_get($options, "invalidate"),
                 "proxy" => \Cloudinary::option_get($options, "proxy"),
                 "folder" => \Cloudinary::option_get($options, "folder"),
-                "tags" => implode(",", \Cloudinary::build_array(\Cloudinary::option_get($options, "tags"))));
-            return array_filter($params);
+                "tags" => implode(",", \Cloudinary::build_array(\Cloudinary::option_get($options, "tags"))),
+                "context" => \Cloudinary::encode_assoc_array(\Cloudinary::option_get($options, "context")),
+                "face_coordinates" => \Cloudinary::encode_double_array(\Cloudinary::option_get($options, "face_coordinates")),
+                "allowed_formats" => \Cloudinary::encode_array(\Cloudinary::option_get($options, "allowed_formats")));
+	    array_walk($params, function (&$value, $key){ $value = (is_bool($value) ? ($value ? "1" : "0") : $value);});
+	    return array_filter($params,function($v){ return !is_null($v) && ($v !== "" );});
         }
 
         public static function upload($file, $options = array())
@@ -67,7 +72,8 @@ namespace Cloudinary {
                 "callback" => \Cloudinary::option_get($options, "callback"),
                 "eager" => Uploader::build_eager(\Cloudinary::option_get($options, "eager")),
                 "headers" => Uploader::build_custom_headers(\Cloudinary::option_get($options, "headers")),
-                "tags" => implode(",", \Cloudinary::build_array(\Cloudinary::option_get($options, "tags")))
+                "tags" => \Cloudinary::encode_array(\Cloudinary::option_get($options, "tags")),
+                "face_coordinates" => \Cloudinary::encode_double_array(\Cloudinary::option_get($options, "face_coordinates"))
             );
             return Uploader::call_api("explicit", $params, $options);
         }
@@ -158,7 +164,6 @@ namespace Cloudinary {
         public static function call_api($action, $params, $options = array(), $file = NULL)
         {
             $return_error = \Cloudinary::option_get($options, "return_error");
-            
             $params = \Cloudinary::sign_request($params, $options);
 
             $api_url = \Cloudinary::cloudinary_api_url($action, $options);
@@ -182,8 +187,9 @@ namespace Cloudinary {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 360);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $post_params);
-            curl_setopt($ch, CURLOPT_CAINFO,realpath(dirname(__FILE__))."/cacert.pem");
+            curl_setopt($ch, CURLOPT_CAINFO,realpath(dirname(__FILE__)).DIRECTORY_SEPARATOR."cacert.pem");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_USERAGENT, \Cloudinary::USER_AGENT);
             $response = curl_exec($ch);
             $curl_error = NULL;
             if(curl_errno($ch))
@@ -237,108 +243,6 @@ namespace Cloudinary {
                 return implode("\n", array_map($join_pair, array_keys($headers), array_values($headers)));
             }
         }  
-    }
-
-	class PreloadedFile {
-		public static $PRELOADED_CLOUDINARY_PATH = "/^([^\/]+)\/([^\/]+)\/v(\d+)\/([^#]+)#([^\/]+)$/";
-		
-  		public $filename, $version, $public_id, $signature, $resource_type, $type;
-		
-	    public function __construct($file_info) {
-	    	if (preg_match(\Cloudinary\PreloadedFile::$PRELOADED_CLOUDINARY_PATH, $file_info, $matches)) {
-	    		$this->resource_type = $matches[1]; 
-	    		$this->type = $matches[2];
-	    		$this->version = $matches[3];
-	    		$this->filename = $matches[4];
-	    		$this->signature = $matches[5];
-				
-				$public_id_and_format = $this->split_format($this->filename);
-				$this->public_id = $public_id_and_format[0];
-				$this->format = $public_id_and_format[1]; 
-
-			} else {
-				throw new \InvalidArgumentException("Invalid preloaded file info");	
-			}			
-	    }
-		
-		public function is_valid() {
-		    $public_id = $this->resource_type == "raw" ? $this->filename : $this->public_id;
-		    $expected_signature = \Cloudinary::api_sign_request(array("public_id" => $public_id, "version" => $this->version), \Cloudinary::config_get("api_secret")); 
-		    return $this->signature == $expected_signature;			
-		}
-
-    protected function split_format($identifier) {
-			$last_dot = strrpos($identifier, ".");
-			
-			if ($last_dot === false) {
-				return array($identifier, NULL);
-			} 
-			$public_id = substr($identifier, 0, $last_dot);	
-			$format = substr($identifier, $last_dot+1);
-			return array($public_id, $format);    
-		}
-
-		public function identifier() {
-			return "v" . $this->version . "/" . $this->filename;
-		}
-		
-		  
-	    public function __toString() {
-			return $this->resource_type . "/" . $this->type . "/v" . $this->version . "/" . $this->filename . "#" . $this->signature;
-		}
-		
-	}
-}
-
-namespace {
-    function cl_upload_url($options = array()) 
-    {
-        if (!isset($options["resource_type"])) $options["resource_type"] = "auto";
-        return Cloudinary::cloudinary_api_url("upload", $options);      
-    }
-
-    function cl_upload_tag_params($options = array()) 
-    {
-        $params = Cloudinary\Uploader::build_upload_params($options);
-        $params = Cloudinary::sign_request($params, $options);
-        return json_encode($params);
-    }
-    
-    function cl_image_upload_tag($field, $options = array())
-    {
-        $html_options = Cloudinary::option_get($options, "html", array());
-
-        $classes = array("cloudinary-fileupload");
-        if (isset($html_options["class"])) {
-            array_unshift($classes, Cloudinary::option_consume($html_options, "class"));
-        }
-        $tag_options = array_merge($html_options, array("type" => "file", "name" => "file",
-            "data-url" => cl_upload_url($options),
-            "data-form-data" => cl_upload_tag_params($options),
-            "data-cloudinary-field" => $field,
-            "class" => implode(" ", $classes),
-        ));
-        return '<input ' . Cloudinary::html_attrs($tag_options) . '/>';
-    }
-
-    function cl_form_tag($callback_url, $options = array())
-    {
-        $form_options = Cloudinary::option_get($options, "form", array());
-
-        $options["callback_url"] = $callback_url;
-
-        $params = Cloudinary\Uploader::build_upload_params($options);
-        $params = Cloudinary::sign_request($params, $options);
-
-        $api_url = Cloudinary::cloudinary_api_url("upload", $options);
-
-        $form = "<form enctype='multipart/form-data' action='" . $api_url . "' method='POST' " . Cloudinary::html_attrs($form_options) . ">\n";
-        foreach ($params as $key => $value) {
-            $form .= "<input " . Cloudinary::html_attrs(array("name" => $key, "value" => $value, "type" => "hidden")) . "/>\n";
-        }
-        $form .= "</form>\n";
-
-        return $form;
     }
 }
 ?>
