@@ -3,6 +3,7 @@ Cloudinary PHP Sample Project
 
 Included in this folder are two sample projects for demonstrating the common Cloudinary's usage in PHP.
 
+*Note: PHP 5.3+ is required.*
 
 ## Installation
 
@@ -31,7 +32,7 @@ A simple web application that allows you to uploads photos, maintain a database 
 
 Make sure to first create a MySQL database (e.g., `create database photo_album`). Then edit `settings.php` to have the correct database details. For example:
 
-    R::setup('mysql:host=localhost;dbname=photo_album', 'my_db_user', 'my_db_password');
+    R::setup('mysql:host=127.0.0.1;dbname=photo_album', 'my_db_user', 'my_db_password');
 
 You can access it through http://YOUR\_SERVER/PATH\_TO\_CLOUDINARY\_PHP/samples/PhotoAlbum/list.php
 

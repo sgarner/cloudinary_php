@@ -52,13 +52,19 @@ class Api {
     $type = \Cloudinary::option_get($options, "type");
     $uri = array("resources", $resource_type);
     if ($type) array_push($uri, $type);
-    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "prefix", "tags", "context", "direction")), $options);    
+    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "prefix", "tags", "context", "moderations", "direction", "start_at")), $options);    
   }
   
   function resources_by_tag($tag, $options=array()) {
     $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
     $uri = array("resources", $resource_type, "tags", $tag);
-    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "tags", "context", "direction")), $options);    
+    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "tags", "context", "moderations", "direction")), $options);    
+  }
+
+  function resources_by_moderation($kind, $status, $options=array()) {
+    $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
+    $uri = array("resources", $resource_type, "moderations", $kind, $status);
+    return $this->call_api("get", $uri, $this->only($options, array("next_cursor", "max_results", "tags", "context", "moderations", "direction")), $options);
   }
   
   function resources_by_ids($public_ids, $options=array()) {
@@ -66,14 +72,34 @@ class Api {
     $type = \Cloudinary::option_get($options, "type", "upload");
     $uri = array("resources", $resource_type, $type);
     $params = array_merge($options, array("public_ids" => $public_ids));
-    return $this->call_api("get", $uri, $this->only($params, array("public_ids", "tags", "context")), $options);    
+    return $this->call_api("get", $uri, $this->only($params, array("public_ids", "tags", "moderations", "context")), $options);    
   }
   
   function resource($public_id, $options=array()) {
     $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
     $type = \Cloudinary::option_get($options, "type", "upload");
     $uri = array("resources", $resource_type, $type, $public_id);
-    return $this->call_api("get", $uri, $this->only($options, array("exif", "colors", "faces", "image_metadata", "pages", "max_results")), $options);      
+    return $this->call_api("get", $uri, $this->only($options, array("exif", "colors", "faces", "image_metadata", "phash", "pages", "max_results")), $options);      
+  }
+  
+  function update($public_id, $options=array()) {
+    $resource_type = \Cloudinary::option_get($options, "resource_type", "image");
+    $type = \Cloudinary::option_get($options, "type", "upload");
+    $uri = array("resources", $resource_type, $type, $public_id);
+
+    $tags = \Cloudinary::option_get($options, "tags");
+    $context = \Cloudinary::option_get($options, "context");
+    $face_coordinates = \Cloudinary::option_get($options, "face_coordinates");
+    $update_options = array_merge(
+      $this->only($options, array("moderation_status", "raw_convert", "ocr", "categorization", "detection", "similarity_search", "auto_tagging")),
+      array(
+        "tags" => $tags ? implode(",", \Cloudinary::build_array($tags)) : $tags,
+        "context" => $context ? \Cloudinary::encode_assoc_array($context) : $context,
+        "face_coordinates" => $face_coordinates ? \Cloudinary::encode_double_array($face_coordinates) : $face_coordinates,
+      )
+    );
+
+    return $this->call_api("post", $uri, $update_options, $options);      
   }
   
   function delete_resources($public_ids, $options=array()) {
@@ -143,6 +169,31 @@ class Api {
     return $this->call_api("post", $uri, array("transformation"=>$this->transformation_string($definition)), $options);    
   }
   
+  function upload_presets($options=array()) {
+    return $this->call_api("get", array("upload_presets"), $this->only($options, array("next_cursor", "max_results")), $options);    
+  }
+  
+  function upload_preset($name, $options=array()) {
+    $uri = array("upload_presets", $name);
+    return $this->call_api("get", $uri, $this->only($options, array("max_results")), $options);    
+  }
+  
+  function delete_upload_preset($name, $options=array()) {
+    $uri = array("upload_presets", $name);
+    return $this->call_api("delete", $uri, array(), $options);    
+  }
+    
+  function update_upload_preset($name, $options=array()) {
+    $uri = array("upload_presets", $name);
+    $params = \Cloudinary\Uploader::build_upload_params($options);
+    return $this->call_api("put", $uri, array_merge($params, $this->only($options, array("unsigned", "disallow_public_id"))), $options);    
+  }
+  
+  function create_upload_preset($options=array()) {
+    $params = \Cloudinary\Uploader::build_upload_params($options);
+    return $this->call_api("post", array("upload_presets"), array_merge($params, $this->only($options, array("name", "unsigned", "disallow_public_id"))), $options);    
+  }
+    
   protected function call_api($method, $uri, $params, &$options) {
     $prefix = \Cloudinary::option_get($options, "upload_prefix", \Cloudinary::config_get("upload_prefix", "https://api.cloudinary.com"));
     $cloud_name = \Cloudinary::option_get($options, "cloud_name", \Cloudinary::config_get("cloud_name"));
@@ -239,4 +290,3 @@ class Api {
 }
 
 }
-?>
